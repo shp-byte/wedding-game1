@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בדרך לחופה - מיכל וינון</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+    
+    <style>
+        :root {
+            --gold: #d4af37;
+            --gold-light: #f1d592;
+            --turquoise: #40AFA9;
+            --turquoise-dark: #2D8B86;
+            --antique-pink: #C58B8B;
+            --antique-pink-dark: #A66B6B;
+            --white: #ffffff;
+            --text: #4a4a4a;
+            --success: #4CAF50;
+            --error: #e57373;
+            --bg-soft: #fffaf1;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: var(--text);
+            margin: 0; padding: 0;
+            direction: rtl;
+            overflow-x: hidden;
+            background-color: var(--bg-soft);
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=2069&auto=format&fit=crop');
+            background-size: cover; background-position: center;
+            opacity: 0.08; z-index: -1;
+        }
+
+        .container {
+            width: 92%;
+            max-width: 650px;
+            margin: 20px auto;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            position: relative;
+            z-index: 10;
+        }
+
+        .host-container { max-width: 1100px; }
+
+        h1 { background: linear-gradient(135deg, var(--gold), var(--gold-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.2rem; margin: 10px 0; }
+
+        .screen { display: none; animation: fadeIn 0.4s ease; }
+        .active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* כפתור אורח - טורקיז */
+        button {
+            padding: 14px 28px;
+            font-size: 18px;
+            border-radius: 50px;
+            border: none;
+            background: linear-gradient(135deg, var(--turquoise), var(--turquoise-dark));
+            color: white;
+            cursor: pointer;
+            transition: 0.3s;
+            margin: 8px 0;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(64, 175, 169, 0.2);
+            width: 100%;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(64, 175, 169, 0.4); }
+        button:disabled { background: #e0e0e0; color: #999; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* כפתור זוג - ורוד עתיק */
+        .couple-select-btn {
+            background: linear-gradient(135deg, var(--antique-pink), var(--antique-pink-dark));
+            box-shadow: 0 4px 15px rgba(197, 139, 139, 0.2);
+        }
+        .couple-select-btn:hover { box-shadow: 0 6px 20px rgba(197, 139, 139, 0.4); }
+
+        /* Chuppah Path with Lanes */
+        .path-wrapper {
+            position: relative;
+            background: white;
+            border: 2px solid var(--gold-light);
+            border-radius: 20px;
+            padding: 40px 20px;
+            margin: 30px 0;
+            overflow-y: auto;
+            max-height: 480px;
+        }
+
+        .chuppah-goal {
+            position: absolute;
+            left: 20px; top: 0; bottom: 0;
+            width: 100px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 60px;
+            background: rgba(212, 175, 55, 0.05);
+            border-right: 2px dashed var(--gold-light);
+            z-index: 5;
+        }
+
+        .participants-lanes { display: flex; flex-direction: column; gap: 15px; padding-left: 120px; }
+
+        .p-lane {
+            position: relative;
+            height: 40px;
+            background: rgba(0,0,0,0.03);
+            border-radius: 20px;
+            width: 100%;
+        }
+
+        .p-avatar-box {
+            position: absolute;
+            right: 0; top: 50%;
+            transform: translateY(-50%);
+            transition: all 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .avatar-circle {
+            width: 38px; height: 38px;
+            background: white;
+            border: 2px solid var(--gold);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .p-name-tag {
+            font-size: 13px; font-weight: bold;
+            background: white; padding: 2px 10px;
+            border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            white-space: nowrap;
+        }
+
+        /* Leaderboard and Podium */
+        .leaderboard-container { margin-top: 25px; background: #fff; border-radius: 20px; padding: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
+        .lb-table { width: 100%; border-collapse: collapse; }
+        .lb-table th { color: var(--turquoise); padding: 10px; border-bottom: 2px solid var(--bg-soft); }
+        .lb-table td { padding: 10px; border-bottom: 1px solid var(--bg-soft); font-weight: bold; }
+
+        .podium-box { display: flex; align-items: flex-end; justify-content: center; gap: 15px; margin: 60px 0 30px; height: 280px; }
+        .podium-step { display: flex; flex-direction: column; align-items: center; width: 130px; animation: slideUp 1s ease-out; }
+        .step-base {
+            width: 100%; display: flex; align-items: center; justify-content: center;
+            font-size: 45px; font-weight: bold; color: rgba(255,255,255,0.9);
+            border-radius: 15px 15px 0 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .gold-step { height: 180px; background: linear-gradient(to top, #BF953F, #FCF6BA, #B38728); z-index: 3; }
+        .silver-step { height: 130px; background: linear-gradient(to top, #757F9A, #D7DDE8); z-index: 2; }
+        .bronze-step { height: 90px; background: linear-gradient(to top, #804A00, #A0522D); z-index: 1; }
+
+        .winner-data { margin-bottom: 15px; text-align: center; }
+        .winner-av { font-size: 50px; margin-bottom: 5px; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1)); }
+        .winner-nm { font-weight: 800; font-size: 18px; color: var(--text); }
+
+        @keyframes slideUp { from { transform: translateY(150px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Celebration */
+        #fw-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
+
+        /* Avatar Selection */
+        .avatar-grid { 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); 
+            gap: 12px; padding: 20px; background: white; border-radius: 20px;
+            max-height: 250px; overflow-y: auto; border: 1px solid #f0f0f0;
+        }
+        .avatar-opt { 
+            font-size: 32px; cursor: pointer; border: 2px solid transparent; 
+            border-radius: 50%; width: 50px; height: 50px; 
+            display: flex; align-items: center; justify-content: center; transition: 0.2s; 
+        }
+        .avatar-opt.selected { border-color: var(--gold); background: #fffdf5; transform: scale(1.15); box-shadow: 0 4px 10px rgba(212, 175, 55, 0.2); }
+
+        input { padding: 16px; width: 100%; border-radius: 15px; border: 2px solid #f0f0f0; margin-bottom: 20px; text-align: center; font-size: 18px; box-sizing: border-box; outline: none; transition: 0.2s; }
+        input:focus { border-color: var(--turquoise); box-shadow: 0 0 10px rgba(64, 175, 169, 0.1); }
+        
+        /* בחירת תשובה במשחק */
+        .game-opt-btn { 
+            width: 100%; margin: 10px 0; background: white; color: var(--text); 
+            border: 2px solid #f0f0f0; text-align: right; padding: 18px 22px; 
+            border-radius: 18px; font-weight: 600; line-height: 1.4; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        .game-opt-btn.selected { 
+            background: rgba(64, 175, 169, 0.1); 
+            border-color: var(--turquoise); 
+            color: var(--turquoise-dark);
+        }
+        
+        #msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 30px; border-radius: 50px; color: white; display: none; z-index: 2000; font-weight: bold; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+        
+        .question-counter { font-size: 14px; color: var(--gold); font-weight: bold; margin-bottom: 5px; display: block; }
+        .final-rank-tag { font-size: 65px; margin: 25px 0; display: block; }
+        .final-reinforcement { font-size: 26px; font-weight: bold; color: var(--gold); margin-bottom: 25px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+<canvas id="fw-canvas"></canvas>
+<div id="msg"></div>
+
+<!-- Screen 1: Role -->
+<div id="role-selection" class="container screen active">
+    <h1>בדרך לחופה 💍</h1>
+    <p style="font-size: 18px; color: #777;">מיכל וינון מתחתנים!</p>
+    <div style="margin: 30px 0;">
+        <button onclick="initApp('player')">אני אורח/ת (משתתף)</button>
+        <button onclick="initApp('couple')" class="couple-select-btn">אנחנו הזוג (מיכל וינון)</button>
+        <button onclick="initApp('host')" style="background: #444; margin-top: 15px;">מסך המקרן (לאולם)</button>
+    </div>
+</div>
+
+<!-- Screen 2: Quick Register -->
+<div id="player-setup" class="container screen">
+    <h2>מצטרפים למסע!</h2>
+    <input id="playerName" type="text" placeholder="השם שלכם">
+    <p style="margin-top: 10px; font-weight: bold; color: var(--gold);">בחרו דמות שתייצג אתכם:</p>
+    <div id="avatarList" class="avatar-grid"></div>
+    <button onclick="joinGame()" style="margin-top: 25px;">בואו נשחק! 🎉</button>
+</div>
+
+<!-- Screen 3: Waiting -->
+<div id="waiting-room" class="container screen">
+    <h2 id="wait-msg">מתכוננים לחופה...</h2>
+    <div id="my-id-label" style="margin: 30px 0; font-size: 24px; font-weight: bold; color: var(--gold);"></div>
+    <div style="font-size: 100px; margin: 30px 0;">💍</div>
+    <p>המתינו שהמנחה יתחיל את הסיטואציה הבאה</p>
+</div>
+
+<!-- Screen 4: Gameplay Player -->
+<div id="player-game" class="container screen">
+    <span class="question-counter" id="p-q-num"></span>
+    <h3 id="q-text" style="font-size: 20px; margin-bottom: 25px; color: var(--gold); line-height: 1.5;"></h3>
+    <div id="q-options"></div>
+    <div id="p-status-box" style="margin-top: 30px; padding: 20px; border-radius: 20px; display: none;">
+        <p id="p-status" style="font-weight: bold; margin: 0; font-size: 18px;"></p>
+    </div>
+</div>
+
+<!-- Screen 5: Couple Logic -->
+<div id="couple-game" class="container screen">
+    <h2 style="color: var(--antique-pink);">מה האמת שלכם? ❤️</h2>
+    <span class="question-counter" id="c-q-num"></span>
+    <p id="couple-q-text" style="font-size: 18px; font-weight: bold; margin: 25px 0; line-height: 1.5;"></p>
+    <div id="couple-options"></div>
+    <p id="couple-waiting" style="color: #888; font-style: italic; display: none; margin-top: 40px; font-size: 18px;">הבחירה נקלטה! המתינו לסיטואציה הבאה.</p>
+</div>
+
+<!-- Screen 6: Host Screen -->
+<div id="main-board-view" class="container host-container screen">
+    <h1 id="host-q-title">המסע של מיכל וינון 💍</h1>
+    <span class="question-counter" id="h-q-num" style="font-size: 20px;"></span>
+    <p id="host-q-desc" style="font-size: 26px; font-weight: bold; color: var(--gold); min-height: 110px; padding: 0 40px; display: flex; align-items: center; justify-content: center; line-height: 1.4;"></p>
+    
+    <div class="path-wrapper">
+        <div class="chuppah-goal">💒</div>
+        <div id="lanes-container" class="participants-lanes"></div>
+    </div>
+
+    <div id="leaderboard-box" class="leaderboard-container" style="display:none;">
+        <h3 style="margin-top:0;">דירוג נוכחי 📊</h3>
+        <table class="lb-table">
+            <thead>
+                <tr><th>מקום</th><th>משתתף</th><th>צעדים לחופה</th></tr>
+            </thead>
+            <tbody id="lb-body"></tbody>
+        </table>
+    </div>
+
+    <div style="margin-top: 40px; display: flex; flex-direction: column; align-items: center; gap: 15px;">
+        <button id="startBtn" onclick="updateGameStep(0)" style="max-width: 350px;">התחל את המשחק! 🎉</button>
+        <button id="nextBtn" style="display:none; max-width: 350px;" onclick="stepForward()">סיטואציה הבאה ⬅️</button>
+        <button id="finishBtn" style="display:none; max-width: 350px;" onclick="updateGameStep(11)">סיום וחשיפת המנצחים! 🏆</button>
+        <button onclick="resetGame()" style="background: transparent; color: #ccc; font-size: 12px; box-shadow: none; text-decoration: underline; width: auto; margin-top: 20px;">איפוס משחק</button>
+    </div>
+</div>
+
+<!-- Screen 7: Host Podium -->
+<div id="podium-screen" class="container host-container screen">
+    <h1>יש לנו מנצחים! 🏆</h1>
+    <div class="podium-box" id="podium-items"></div>
+    <div id="final-blessing" style="margin-top: 50px; font-size: 24px; color: var(--gold); font-weight: bold;">
+        מיכל וינון, שתזכו לבנות בית נאמן בישראל! 💍✨
+    </div>
+    <button onclick="location.reload()" style="max-width: 250px; background: #444; margin-top: 40px;">חזרה להתחלה</button>
+</div>
+
+<!-- Screen 8: Player Personalized Final -->
+<div id="player-final-screen" class="container screen">
+    <h1 id="final-title">הגענו לחופה! 💒</h1>
+    <span id="final-rank-icon" class="final-rank-tag">✨</span>
+    <p id="final-message" class="final-reinforcement"></p>
+    <div style="font-size: 60px; margin: 20px 0;">💍</div>
+    <h2 style="color: var(--gold);">תודה ששמחתם איתנו!</h2>
+    <p style="color: #777;">מאחלים המון מזל טוב למיכל וינון ❤️</p>
+</div>
+
+<script>
+/* ====== CONFIG ====== */
+const firebaseConfig = {
+  apiKey: "AIzaSyD2uL7Ql7_cmh3kMWQh_nLcJ2sg9gLUjbQ",
+  authDomain: "weddinggame-179d5.firebaseapp.com",
+  projectId: "weddinggame-179d5",
+  storageBucket: "weddinggame-179d5.firebasestorage.app",
+  messagingSenderId: "812758178545",
+  appId: "1:812758178545:web:f882b3ef22893e7ab5e750",
+  measurementId: "G-CBYZS3L2J2"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+const appId = "michal-yinon-wedding-vFinal-ElegantColors";
+const configPath = `artifacts/${appId}/public/data/config/gameStatus`;
+const partsPath = `artifacts/${appId}/public/data/participants`;
+
+/* ====== QUESTIONS DATA ====== */
+const questions = [
+    { q: "לילה, אוגוסט. ינון מרגיש שהוא בתוך תנור ורוצה 16 מעלות עם טורבו. מיכל מרגישה שהיא במשלחת לקוטב הצפוני. מה הפשרה?", options: ["ינון ישן עם מזגן ומיכל ישנה עם פוך, גרביים וחלוק של דודה שלה.", "המזגן דולק, אבל מיכל \"מגניבה\" ומכבה אותו כל שעה כשינון נרדם.", "עוברים לישון בסלון כי שם המזגן \"פחות ישיר\".", "פותחים חלון, מפעילים מאוורר תקרה ומתפללים לרוח ירושלמית."] },
+    { q: "12 בלילה, עוד יושבים על הספה והברז פתאום מתחיל לטפטף. מה יעשו?", options: ["ינון קם במקצועיות, ומיד הולך לארגז הכלים.", "מיכל אומרת \"זה סך הכל מוזיקת רקע מרגיעה לשינה\" וממשיכים כרגיל.", "שניהם בוהים בברז ומנהלים דיון מעמיק: \"האם זה נחשב מצב חירום מצדיק אינסטלטור באמצע הלילה?\".", "ינון שם סמרטוט מתחת לטפטוף ומבטיח לתקן את זה \"מחר\"."] },
+    { q: "יצאתם לטיול \"קליל\". ינון אמר שזה מסלול של רבע שעה, בפועל אתם שלוש שעות בתוך קוצים ואין מים.", options: ["מיכל מתחילה לשיר שירי טיולים וממשיכים ללכת בכיף.", "ינון מתעקש ש\"הנה, הנה רואים את האוטו\".", "עוצרים בצל של עץ זית ועושים סעודה מאולתרת מבמבה שמצאו בתיק.", "מיכל מתיישבת על אבן ואומרת: \"אני לא זזה מפה עד שמגיע מסוק\"."] },
+    { q: "מוצאי שבת, עייפות שיא. שניהם רוצים כוס קפה עם עוגה, אבל לאף אחד אין כח לקום למטבח.", options: ["עושים \"אבן נייר ומספריים\" – המפסיד מכין.", "ינון מבטיח למיכל שטיפת כלים בתמורה לכוס קפה.", "נרדמים לפני שמחליטים מי קם.", "ינון קם ואומר למיכל \"אל תקומי את עייפה אני כבר אכין\"."] },
+    { q: "ינון התחיל להגיד דבר תורה בארוחת שבת אצל ההורים. הוא כבר עשר דקות מדבר, האורחים רעבים.", options: ["מיכל משתעלת שיעול \"דיפלומטי\" ומתחילה לחלק את הסלטים.", "מיכל נהנית מכל רגע ומבקשת ממנו להמשיך גם לפרק ב'.", "ינון קולט את המבטים של כולם ומסיים ב: \"ובקיצור, שבת שלום\".", "אין מצב שינון מדבר יותר מ-2 דקות."] },
+    { q: "הגעתם מהקניות עם 15 שקיות. ינון מנסה לקחת את כולן במכה אחת כדי לא לעשות סיבוב שני.", options: ["ינון נתקע בדלת, שקית חלב מתפוצצת ומיכל צוחקת.", "מיכל לוקחת שקית אחת קטנה והולכת לפתוח את הדלת בנחת.", "ינון מצליח להגיע למטבח, אבל לא יכול לפתוח את האצבעות במשך שעה.", "הם משאירים חצי מהדברים באוטו ומחליטים ש\"נביא את זה אחר כך\"."] },
+    { q: "יש ברית ב-10:00 בבוקר בצד השני של הארץ. השעה 9:15. איך זה נראה?", options: ["מיכל מוכנה כבר מאתמול, ינון רק עכשיו מתחיל לחפש חולצה לבנה בלי כתמים.", "ינון מחכה באוטו עם הרכב מונע בעוד מיכל בודקת שוב פעם שהיא לא שכחה כלום.", "שניהם מבינים שאין סיכוי להגיע בזמן ומתחילים להמציא תירוץ על \"פקק דמיוני\" בכביש 6.", "מחליטים יחד ש\"העיקר הכוונה\" ומגיעים בדיוק לקינוחים."] },
+    { q: "יום ראשון בבוקר, הכיורים עולה על גדותיו. מי יתקרב לאירוע?", options: ["עושים הסכם: אחד את החלבי ואחת את הבשרי.", "ינון אומר \"בואי נשאיר את זה ככה, אולי זה ייעלם מעצמו עד מחר\".", "מיכל מתקתקת הכל ב-10 דקות תוך כדי שהיא מסבירה לינון למה הוא לא יעיל.", "מחליטים להשתמש רק בכלים חד-פעמיים מהיום והלאה."] },
+    { q: "אורזים לחופשה הראשונה כזוג. ינון לוקח תיק גב קטן, מיכל עם מזוודה של 30 קילו. מה קורה בבידוק?", options: ["ינון מנסה לדחוף חצי מהדברים לתיק שלו כדי לא לשלם על מזוודה נוספת.", "מיכל לובשת 4 שכבות של בגדים כדי להוריד משקל מהמזוודה.", "ינון פשוט קונה עוד מזוודה ריקה בשדה התעופה \"שיהיה למתנות\".", "משאירים חצי מהבגדים באוטו של ההורים ונוסעים \"קליל\"."] },
+    { q: "יום שישי, 40 דקות לשבת. הבית הפוך, החלות בתנור והספונג'ה רק התחילה. מה האסטרטגיה?", options: ["ינון עובר למצב \"טורבו\" עם המגב ומיכל בורחת למקלחת.", "מיכל מחליטה ש\"העיקר הכוונה\" ומדליקה נרות על רצפה רטובה.", "שניהם נכנסים ללחץ ומתחילים לחפש איפה הפלטה של שבת.", "מיכל מתקתקת הכל וינון שואל \"צריכה עזרה?\" כשכבר הכל מוכן."] },
+    { q: "בוחרים ספה לסלון. ינון רוצה משהו \"נוח שאפשר לישון עליו\", מיכל רוצה משהו \"מעוצב בגוון שמנת\".", options: ["קונים ספה בשמנת וינון ישן עליה עם כיסוי ניילון.", "מתפשרים על ספה אפורה - שהיא גם לא יפה וגם לא נוחה.", "ינון נכנע \"בשביל שלום בית\" וקונה מה שמיכל רוצה.", "ממשיכים לשבת על כסאות פלסטיק של \"כתר\" עד שיחליטו סופית."] }
+];
+
+const avatars = ["🤵‍♂️", "👰‍♀️", "🧔‍♂️", "👵", "👴", "👶", "💃", "🕺", "💑", "💏", "💍", "🕍", "🍷", "🥂", "🍰", "🥨", "🍕", "🍔", "🍦", "🍭", "🍩", "🍫", "🍿", "🍪", "🍎", "🥑", "🥐", "🥳", "😎", "😂", "😇", "🧿", "🎸", "🎷", "🎹", "🎤", "🎻", "👞", "👠", "👒", "👑", "🐶", "🐱", "🐰", "🦊", "🦁", "🐧", "🦄", "🌈", "🔥", "✨", "❤️", "✡️"];
+
+let myState = { role: '', name: '', avatar: '', uid: '', score: 0 };
+
+/* ====== CORE LOGIC ====== */
+async function initApp(role) {
+    myState.role = role;
+    try {
+        await auth.signInAnonymously();
+        myState.uid = auth.currentUser.uid;
+        if (role === 'host') setupHost();
+        else if (role === 'couple') setupCouple();
+        else setupPlayerSetup();
+    } catch (e) { toast("שגיאת חיבור", "var(--error)"); }
+}
+
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+}
+
+function toast(text, color = 'var(--gold)') {
+    const m = document.getElementById('msg');
+    m.innerText = text; m.style.backgroundColor = color; m.style.display = 'block';
+    setTimeout(() => m.style.display = 'none', 3000);
+}
+
+/* ====== PLAYER REG ====== */
+function setupPlayerSetup() {
+    const aL = document.getElementById('avatarList');
+    aL.innerHTML = "";
+    avatars.forEach(av => {
+        const div = document.createElement('div');
+        div.className = "avatar-opt"; div.innerText = av;
+        div.onclick = () => {
+            myState.avatar = av;
+            document.querySelectorAll('.avatar-opt').forEach(x => x.classList.remove('selected'));
+            div.classList.add('selected');
+        };
+        aL.appendChild(div);
+    });
+    showScreen('player-setup');
+}
+
+async function joinGame() {
+    myState.name = document.getElementById('playerName').value.trim();
+    if (!myState.name) return toast("נא להזין שם", "var(--error)");
+    if (!myState.avatar) return toast("נא לבחור אימוג'י", "var(--error)");
+    await db.doc(`${partsPath}/${myState.uid}`).set({ name: myState.name, avatar: myState.avatar, score: 0, lastStep: -1, choice: null });
+    document.getElementById('my-id-label').innerText = `${myState.avatar} ${myState.name}`;
+    showScreen('waiting-room');
+    listenForGame();
+}
+
+function listenForGame() {
+    db.doc(configPath).onSnapshot(doc => {
+        const data = doc.data();
+        if (!data || data.step === -1) showScreen('waiting-room');
+        else if (data.step < 11) renderPlayerQ(data.step, data.correctAns);
+        else finalizePlayer();
+    });
+}
+
+async function finalizePlayer() {
+    const snap = await db.collection(partsPath).get();
+    const sorted = snap.docs.map(d => d.data()).sort((a,b) => b.score - a.score);
+    const myRank = sorted.findIndex(p => p.name === myState.name && p.avatar === myState.avatar) + 1;
+    const icon = document.getElementById('final-rank-icon');
+    const msg = document.getElementById('final-message');
+    
+    if (myRank === 1) { icon.innerText = "🏆"; msg.innerText = "מקום ראשון! אתם מכירים את מיכל וינון הכי טוב באולם! 🥇✨"; }
+    else if (myRank === 2) { icon.innerText = "🥈"; msg.innerText = "מקום שני! כמעט הגעתם לחופה ראשונים, כל הכבוד! 🥈"; }
+    else if (myRank === 3) { icon.innerText = "🥉"; msg.innerText = "מקום שלישי! איזה יופי של היכרות עם הזוג! 🥉"; }
+    else { icon.innerText = "✨"; msg.innerText = "תודה שהשתתפתם במסע שלנו לחופה! שמחנו שחלקתם איתנו את הרגע."; }
+    
+    showScreen('player-final-screen');
+}
+
+function renderPlayerQ(step, correct) {
+    const q = questions[step];
+    document.getElementById('p-q-num').innerText = `סיטואציה ${step + 1} מתוך 11`;
+    const qT = document.getElementById('q-text');
+    const qO = document.getElementById('q-options');
+    const pS = document.getElementById('p-status-box');
+    const pST = document.getElementById('p-status');
+
+    db.doc(`${partsPath}/${myState.uid}`).get().then(pDoc => {
+        const pD = pDoc.data();
+        qT.innerText = q.q; qO.innerHTML = "";
+        showScreen('player-game');
+        const voted = pD.lastStep === step && pD.choice !== null;
+        if (voted) {
+            pS.style.display = "block";
+            if (correct !== null) {
+                const right = pD.choice === correct;
+                pS.style.background = right ? "#e8f5e9" : "#fbe9e7";
+                pST.innerText = right ? "צדקתם! ✨" : "אופס, הזוג בחר אחרת...";
+                pST.style.color = right ? "var(--success)" : "var(--error)";
+            } else { pS.style.background = "#fff8e1"; pST.innerText = "ההימור נשלח! מחכים לראות מה הזוג יבחר..."; }
+        } else pS.style.display = "none";
+        
+        q.options.forEach((opt, i) => {
+            const b = document.createElement('button');
+            b.className = `game-opt-btn ${voted && pD.choice === i ? 'selected' : ''}`;
+            b.innerText = opt; b.disabled = voted;
+            b.onclick = async () => { await db.doc(`${partsPath}/${myState.uid}`).update({ choice: i, lastStep: step }); renderPlayerQ(step, correct); };
+            qO.appendChild(b);
+        });
+    });
+}
+
+/* ====== HOST LOGIC ====== */
+function setupHost() {
+    showScreen('main-board-view');
+    db.doc(configPath).onSnapshot(doc => {
+        const data = doc.data() || { step: -1, correctAns: null };
+        const hDesc = document.getElementById('host-q-desc');
+        const hCount = document.getElementById('h-q-num');
+        const sBtn = document.getElementById('startBtn');
+        const nBtn = document.getElementById('nextBtn');
+        const fBtn = document.getElementById('finishBtn');
+        if (data.step === -1) { hDesc.innerText = "הצטרפו למשחק! הזינו שם ובחרו דמות..."; hCount.innerText = ""; sBtn.style.display = "block"; nBtn.style.display = "none"; fBtn.style.display = "none"; }
+        else if (data.step < 11) {
+            sBtn.style.display = "none";
+            const answered = data.correctAns !== null;
+            nBtn.style.display = (answered && data.step < 10) ? "block" : "none";
+            fBtn.style.display = (answered && data.step === 10) ? "block" : "none";
+            hCount.innerText = `שאלה ${data.step + 1} מתוך 11`;
+            hDesc.innerText = questions[data.step].q;
+            document.getElementById('leaderboard-box').style.display = answered ? "block" : "none";
+        } else { showPodium(); }
+    });
+    db.collection(partsPath).onSnapshot(snap => { const parts = snap.docs.map(d => d.data()); renderLanes(parts); renderLeaderboard(parts); });
+}
+
+function renderLanes(parts) {
+    const container = document.getElementById('lanes-container');
+    container.innerHTML = "";
+    parts.forEach(p => {
+        const lane = document.createElement('div'); lane.className = "p-lane";
+        const progress = (p.score / 11) * 100; 
+        lane.innerHTML = `<div class="p-avatar-box" style="right: ${progress}%"><div class="avatar-circle">${p.avatar || '👤'}</div><div class="p-name-tag">${p.name}</div></div>`;
+        container.appendChild(lane);
+    });
+}
+
+function renderLeaderboard(parts) {
+    const sorted = [...parts].sort((a,b) => b.score - a.score).slice(0, 5);
+    const body = document.getElementById('lb-body'); body.innerHTML = "";
+    sorted.forEach((p, i) => { const row = document.createElement('tr'); row.innerHTML = `<td>${i+1}</td><td>${p.name}</td><td>${p.score} צעדים</td>`; body.appendChild(row); });
+}
+
+async function showPodium() {
+    showScreen('podium-screen'); startFireworks();
+    const snap = await db.collection(partsPath).get();
+    const sorted = snap.docs.map(d => d.data()).sort((a,b) => b.score - a.score);
+    const display = document.getElementById('podium-items'); display.innerHTML = "";
+    const layout = [{ data: sorted[1], rank: 2, class: 'silver-step' }, { data: sorted[0], rank: 1, class: 'gold-step' }, { data: sorted[2], rank: 3, class: 'bronze-step' }];
+    layout.forEach(pos => { if (pos.data) {
+        const step = document.createElement('div'); step.className = "podium-step";
+        step.innerHTML = `<div class="winner-data"><div class="winner-av">${pos.data.avatar}</div><div class="winner-nm">${pos.data.name}</div></div><div class="step-base ${pos.class}">${pos.rank}</div>`;
+        display.appendChild(step);
+    }});
+}
+
+async function updateGameStep(s) { await db.doc(configPath).set({ step: s, correctAns: null }, { merge: true }); }
+function stepForward() { db.doc(configPath).get().then(doc => { updateGameStep(doc.data().step + 1); }); }
+async function resetGame() { await updateGameStep(-1); const snap = await db.collection(partsPath).get(); const batch = db.batch(); snap.docs.forEach(d => batch.delete(d.ref)); await batch.commit(); }
+
+/* ====== COUPLE LOGIC ====== */
+function setupCouple() {
+    showScreen('couple-game');
+    db.doc(configPath).onSnapshot(doc => {
+        const data = doc.data() || { step: -1, correctAns: null };
+        const qText = document.getElementById('couple-q-text');
+        const counter = document.getElementById('c-q-num');
+        const optDiv = document.getElementById('couple-options');
+        const wait = document.getElementById('couple-waiting');
+        if (data.step === -1 || data.step >= 11) { qText.innerText = "המתינו למנחה..."; counter.innerText = ""; optDiv.innerHTML = ""; wait.style.display = "none"; }
+        else {
+            if (data.correctAns !== null) { qText.innerText = "נשלח! ✨"; optDiv.innerHTML = ""; wait.style.display = "block"; }
+            else { 
+                counter.innerText = `שאלה ${data.step + 1} מתוך 11`; qText.innerText = questions[data.step].q; wait.style.display = "none"; optDiv.innerHTML = "";
+                questions[data.step].options.forEach((o, i) => {
+                    const b = document.createElement('button'); b.className = "couple-select-btn"; b.innerText = o;
+                    b.style.width = "100%"; b.style.margin = "10px 0"; b.style.padding = "15px"; b.style.borderRadius = "15px"; b.style.color = "white"; b.style.border = "none"; b.style.fontWeight = "bold";
+                    b.onclick = () => submitAns(i, data.step); optDiv.appendChild(b);
+                });
+            }
+        }
+    });
+}
+
+async function submitAns(idx, step) {
+    const snap = await db.collection(partsPath).get();
+    const batch = db.batch();
+    snap.docs.forEach(d => { const p = d.data(); if (p.lastStep === step && p.choice === idx) { batch.update(d.ref, { score: (p.score || 0) + 1 }); } });
+    await batch.commit(); await db.doc(configPath).update({ correctAns: idx });
+}
+
+/* ====== FIREWORKS ====== */
+function startFireworks() {
+    const canvas = document.getElementById('fw-canvas'); const ctx = canvas.getContext('2d'); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    let particles = [];
+    function createFW(x, y) {
+        const color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+        for (let i = 0; i < 80; i++) {
+            const angle = Math.random() * Math.PI * 2; const speed = Math.random() * 6 + 2;
+            particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, alpha: 1, color });
+        }
+    }
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.alpha -= 0.012;
+            if (p.alpha <= 0) particles.splice(i, 1);
+            ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fill();
+        });
+        if (Math.random() < 0.06) createFW(Math.random() * canvas.width, Math.random() * canvas.height * 0.4);
+        requestAnimationFrame(animate);
+    }
+    animate();
+}
+</script>
+</body>
+</html>
